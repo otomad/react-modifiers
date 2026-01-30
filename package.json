@@ -1,0 +1,41 @@
+{
+	"name": "react-modifiers",
+	"version": "0.1.0",
+	"description": "Use modifiers to intercept event handling more concisely in React, like \"stop\", \"prevent\".",
+	"author": "lunate",
+	"license": "MIT",
+	"main": "dist/index.js",
+	"module": "dist/index.js",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/otomad/react-modifiers.git"
+	},
+	"homepage": "https://github.com/otomad/react-modifiers",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"clear": "rimraf dist",
+		"build": "npm run clear && tsc --build && npm run fix:prettier-dist",
+		"fix:prettier-dist": "prettier dist/**/*.{js,ts} --write --ignore-path=.prettierignore"
+	},
+	"packageManager": "pnpm@10.27.0",
+	"devDependencies": {
+		"@types/react": "^19.2.10",
+		"prettier": "^3.8.1",
+		"react": "^19.2.4",
+		"rimraf": "^6.1.2",
+		"typescript": "^5.9.3"
+	},
+	"files": [
+		"dist",
+		"!dist/tsconfig.tsbuildinfo"
+	],
+	"keywords": [
+		"react",
+		"event",
+		"modifier",
+		"modifiers",
+		"event modifier",
+		"event modifiers"
+	]
+}
