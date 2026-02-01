@@ -29,6 +29,10 @@ const modifiersCallee =
 					case "prevent":
 						e.preventDefault();
 						continue;
+					case "handled":
+						e.preventDefault();
+						e.stopPropagation();
+						continue;
 					case "self":
 						if (e.target !== e.currentTarget) return;
 						continue;
@@ -105,7 +109,7 @@ const modifiers = getProxy() as unknown as ModifiersRoot;
 export default modifiers;
 
 // prettier-ignore
-const baseEventModifiers = ["stop", "prevent", "self", "once", "noRepeat"] as const;
+const baseEventModifiers = ["stop", "prevent", "handled", "self", "once", "noRepeat"] as const;
 // prettier-ignore
 const modifierKeyEventModifiers = ["ctrl", "shift", "alt", "meta", "exact"] as const;
 // prettier-ignore
@@ -195,7 +199,7 @@ function unifyKeyboardCode(code: string) {
 	);
 }
 
-type BaseEventModifiers = "stop" | "prevent" | "self" | "once";
+type BaseEventModifiers = (typeof baseEventModifiers)[number];
 type ModifierKeyEventModifiers = (typeof modifierKeyEventModifiers)[number];
 type LockKeyEventModifiers = (typeof lockKeyEventModifiers)[number];
 type MouseEventModifiers = (typeof mouseEventModifiers)[number];
@@ -204,7 +208,10 @@ type KeyboardEventModifiers = (typeof keyboardEventModifiers)[number];
 type AllEventModifiers = BaseEventModifiers | ModifierKeyEventModifiers | LockKeyEventModifiers | MouseEventModifiers | PointerEventModifiers | KeyboardEventModifiers;
 type LowerCasedAllEventModifiers = Lowercase<AllEventModifiers>;
 
-type Modifiers<TExclude extends string> = (<TEvent extends SyntheticEvent>(listener: EventHandler<TEvent>) => EventHandler<TEvent>) & {
+type Modifiers<TExclude extends string> = {
+	<TEvent extends SyntheticEvent>(listener?: EventHandler<TEvent>): EventHandler<TEvent>;
+	<TEvent extends Event>(listener?: (e: TEvent) => void): (e: TEvent) => void;
+} & {
 	[modifier in Exclude<AllEventModifiers, TExclude>]: Modifiers<
 		| TExclude
 		| (modifier extends "capsLockOn" | "capsLockOff" ? "capsLockOn" | "capsLockOff"
