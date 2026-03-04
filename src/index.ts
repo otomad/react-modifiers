@@ -12,7 +12,7 @@ const modifiersCallee =
 		if (modifiers.length === 0) throw new RangeError("You have not use any modifiers");
 		const modifierKeys = modifiers.filter(modifier => modifierKeyEventModifiers.includes(modifier)) as ModifierKeyEventModifiers[];
 		const otherKeys = modifiers.filter(modifier => lowerCasedKeyboardEventModifiers.includes(modifier)) as KeyboardEventModifiers[];
-		const pointerKeys = modifiers.filter(modifier => pointerEventModifiers.includes(modifier)) as PointerEventModifiers[];
+		const pointers = modifiers.filter(modifier => pointerEventModifiers.includes(modifier)) as PointerEventModifiers[];
 		const mouseCodes = (modifiers.filter(modifier => lowerCasedMouseEventModifiers.includes(modifier)) as MouseEventModifiers[]).map(
 			button => mouseButtonCodes[button],
 		);
@@ -61,6 +61,13 @@ const modifiersCallee =
 						(modifier === "meta" && !e.metaKey)
 					)
 						return;
+					else if (
+						(modifier === "ctrl" && e.ctrlKey) ||
+						(modifier === "shift" && e.shiftKey) ||
+						(modifier === "alt" && e.altKey) ||
+						(modifier === "meta" && e.metaKey)
+					)
+						continue;
 					if (modifier === "exact")
 						if (
 							(!modifierKeys.includes("ctrl") && e.ctrlKey) ||
@@ -69,6 +76,7 @@ const modifiersCallee =
 							(!modifierKeys.includes("meta") && e.metaKey)
 						)
 							return;
+						else continue;
 					if (lockKeyEventModifiers.includes(modifier)) {
 						const key = modifier
 							.replace(/(on|off)$/i, "")
@@ -76,12 +84,13 @@ const modifiersCallee =
 							.replace(/^\w/, c => c.toUpperCase()) as ModifierKey;
 						const on = modifier.endsWith("on");
 						if (e.getModifierState(key) !== on) return;
+						else continue;
 					}
 				}
 			}
-			if (isPointerEvent(e) && !pointerKeys.includes(e.pointerType)) return;
-			if (isMouseEvent(e) && !mouseCodes.includes(e.buttons)) return;
-			if (isKeyboardEvent(e)) {
+			if (isPointerEvent(e) && pointers.length && !pointers.includes(e.pointerType)) return;
+			if (isMouseEvent(e) && mouseCodes.length && !mouseCodes.some(code => e.buttons & code)) return;
+			if (isKeyboardEvent(e) && otherKeys.length) {
 				const code = unifyKeyboardCode(e.code);
 				if (lowerCasedKeyboardEventModifiers.includes(code) && !otherKeys.includes(code)) return;
 			}
@@ -95,18 +104,16 @@ const getProxy = (declaredModifiers: LowerCasedAllEventModifiers[] = []) =>
 			if (typeof modifier === "symbol") return;
 			modifier = modifier.toLowerCase();
 			if (modifier in aliases) modifier = aliases[modifier as keyof typeof aliases];
-			asserts<LowerCasedAllEventModifiers>(modifier);
-			return getProxy([...declaredModifiers, ...(declaredModifiers.includes(modifier) ? [] : [modifier])]);
+			const lowerCasedModifier = modifier as LowerCasedAllEventModifiers;
+			return getProxy([...declaredModifiers, ...(declaredModifiers.includes(lowerCasedModifier) ? [] : [lowerCasedModifier])]);
 		},
 		has: (_, modifier) => allEventModifiers.includes(modifier),
 		ownKeys: () => allEventModifiers,
 	});
 
-function asserts<T>(object: unknown): asserts object is T {}
+const mod = getProxy() as unknown as ModifiersRoot;
 
-const modifiers = getProxy() as unknown as ModifiersRoot;
-
-export default modifiers;
+export default mod;
 
 // prettier-ignore
 const baseEventModifiers = ["stop", "prevent", "handled", "self", "once", "noRepeat"] as const;
@@ -115,11 +122,11 @@ const modifierKeyEventModifiers = ["ctrl", "shift", "alt", "meta", "exact"] as c
 // prettier-ignore
 const lockKeyEventModifiers = ["capsLockOn", "capsLockOff", "numLockOn", "numLockOff", "scrollLockOn", "scrollLockOff"] as const;
 // prettier-ignore
-const mouseEventModifiers = ["left", "right", "middle", "leftRight", "leftMiddle", "rightMiddle", "leftRightMiddle"] as const;
+const mouseEventModifiers = ["left", "right", "middle"] as const;
 // prettier-ignore
 const pointerEventModifiers = ["mouse", "pen", "touch"] as const;
 // prettier-ignore
-const keyboardEventModifiers = ["esc", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "tab", "capsLock", "space", "backspace", "enter", "application", "printScreen", "scrollLock", "pause", "insert", "delete", "home", "end", "pageUp", "pageDown", "up", "down", "left", "right", "numLock", "`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d", "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m", "-", "+", "=", "[", "]", "\\", ";", "'", ",", ".", "/", "*"] as const;
+const keyboardEventModifiers = ["esc", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "tab", "capsLock", "space", "backspace", "enter", "application", "printScreen", "scrollLock", "pause", "insert", "delete", "home", "end", "pageUp", "pageDown", "up", "down", "left", "right", "numLock", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "`", "-", "+", "=", "[", "]", "\\", ";", "'", ",", ".", "/", "*"] as const;
 const allEventModifiers = [
 	...baseEventModifiers,
 	...modifierKeyEventModifiers,
@@ -135,10 +142,6 @@ const mouseButtonCodes = {
 	left: 1,
 	right: 2,
 	middle: 4,
-	leftRight: 3,
-	leftMiddle: 5,
-	rightMiddle: 6,
-	leftRightMiddle: 7,
 } as const satisfies Record<MouseEventModifiers, number>;
 
 const aliases = {
@@ -162,8 +165,6 @@ const aliases = {
 	arrowdown: "down",
 	arrowleft: "left",
 	arrowright: "right",
-	middleRight: "rightMiddle",
-	leftMiddleRight: "leftRightMiddle",
 } as const;
 
 function unifyKeyboardCode(code: string) {
@@ -171,7 +172,7 @@ function unifyKeyboardCode(code: string) {
 	let keyDigitNumpadArrow: string | undefined;
 	if (
 		(keyDigitNumpadArrow = code.match(/(?:Digit|Numpad)(\d)/i)?.[1]) ||
-		(keyDigitNumpadArrow = code.match(/Key(A-Z)/i)?.[1]) ||
+		(keyDigitNumpadArrow = code.match(/Key([A-Z])/i)?.[1]) ||
 		(keyDigitNumpadArrow = code.match(/Arrow(\w+)/i)?.[1])
 	)
 		return keyDigitNumpadArrow;

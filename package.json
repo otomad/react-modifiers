@@ -14,7 +14,7 @@
 	},
 	"homepage": "https://github.com/otomad/react-modifiers",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
+		"test": "vitest --config=vitest.config.ts",
 		"clear": "rimraf dist",
 		"build": "npm run clear && tsc --build && npm run fix:prettier-dist",
 		"fix:prettier-dist": "prettier dist/**/*.{js,ts} --write --ignore-path=.prettierignore"
@@ -22,10 +22,14 @@
 	"packageManager": "pnpm@10.27.0",
 	"devDependencies": {
 		"@types/react": "^19.2.10",
+		"@vitejs/plugin-react": "^5.1.4",
+		"@vitest/browser-preview": "^4.0.18",
 		"prettier": "^3.8.1",
 		"react": "^19.2.4",
 		"rimraf": "^6.1.2",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18",
+		"vitest-browser-react": "^2.0.5"
 	},
 	"files": [
 		"dist",
