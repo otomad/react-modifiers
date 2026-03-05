@@ -32,17 +32,17 @@ testEvent(
 	{
 		"Ctrl+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Ctrl}{l}");
+			await userEvent.keyboard("{Ctrl>}L{/Ctrl}");
 			return true;
 		},
 		"Shift+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Shift}{l}");
+			await userEvent.keyboard("{Shift>}L{/Shift}");
 			return false;
 		},
 		"Ctrl+Shift+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Ctrl}{Shift}{l}");
+			await userEvent.keyboard("{Ctrl>}{Shift>}L{/Shift}{/Ctrl}");
 			return true;
 		},
 	},
@@ -54,17 +54,34 @@ testEvent(
 	{
 		"Ctrl+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Ctrl}{l}");
+			await userEvent.keyboard("{Ctrl>}L{/Ctrl}");
 			return true;
 		},
 		"Shift+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Shift}{l}");
+			await userEvent.keyboard("{Shift>}L{/Shift}");
 			return false;
 		},
 		"Ctrl+Shift+L": async button => {
 			button.focus();
-			await userEvent.keyboard("{Ctrl}{Shift}{l}");
+			await userEvent.keyboard("{Ctrl>}{Shift>}L{/Shift}{/Ctrl}");
+			return false;
+		},
+	},
+);
+
+testEvent(
+	"keydown prevent default test",
+	{ onKeyDown: mod.exact.ctrl.shift.l.prevent.p(change) },
+	{
+		"Ctrl+Shift+L": async button => {
+			button.focus();
+			await userEvent.keyboard("{Ctrl>}{Shift>}L{/Shift}{/Ctrl}");
+			return false;
+		},
+		"Ctrl+Shift+P": async button => {
+			button.focus();
+			await userEvent.keyboard("{Ctrl>}{Shift>}P{/Shift}{/Ctrl}");
 			return false;
 		},
 	},

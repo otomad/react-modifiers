@@ -2,9 +2,9 @@ import type { SyntheticEvent, EventHandler, KeyboardEvent, MouseEvent, PointerEv
 
 const onceEvents = new WeakMap<EventHandler<SyntheticEvent>, Set<string>>();
 const noop = () => {};
-const isKeyboardEvent = <T>(e: SyntheticEvent<T>): e is KeyboardEvent<T> => e.nativeEvent instanceof KeyboardEvent || e instanceof KeyboardEvent;
-const isMouseEvent = <T>(e: SyntheticEvent<T>): e is MouseEvent<T> => e.nativeEvent instanceof MouseEvent || e instanceof MouseEvent;
-const isPointerEvent = <T>(e: SyntheticEvent<T>): e is PointerEvent<T> => e.nativeEvent instanceof PointerEvent || e instanceof PointerEvent;
+const checkIsKeyboardEvent = <T>(e: SyntheticEvent<T>): e is KeyboardEvent<T> => e.nativeEvent instanceof KeyboardEvent || e instanceof KeyboardEvent;
+const checkIsMouseEvent = <T>(e: SyntheticEvent<T>): e is MouseEvent<T> => e.nativeEvent instanceof MouseEvent || e instanceof MouseEvent;
+const checkIsPointerEvent = <T>(e: SyntheticEvent<T>): e is PointerEvent<T> => e.nativeEvent instanceof PointerEvent || e instanceof PointerEvent;
 
 const modifiersCallee =
 	(modifiers: (LowerCasedAllEventModifiers | (string & {}))[]) =>
@@ -12,88 +12,94 @@ const modifiersCallee =
 		if (modifiers.length === 0) throw new RangeError("You have not use any modifiers");
 		const modifierKeys = modifiers.filter(modifier => modifierKeyEventModifiers.includes(modifier)) as ModifierKeyEventModifiers[];
 		const otherKeys = modifiers.filter(modifier => lowerCasedKeyboardEventModifiers.includes(modifier)) as KeyboardEventModifiers[];
-		const pointers = modifiers.filter(modifier => pointerEventModifiers.includes(modifier)) as PointerEventModifiers[];
-		const mouseCodes = (modifiers.filter(modifier => lowerCasedMouseEventModifiers.includes(modifier)) as MouseEventModifiers[]).map(
-			button => mouseButtonCodes[button],
-		);
-		if (modifiers.includes("exact") && modifierKeys.length === 0)
+		const exact = modifiers.includes("exact");
+		if (exact && modifierKeys.length === 0)
 			throw new RangeError("You are using the `exact` modifier without any modifier keys (like ctrl, shift, alt, meta), just remove it");
 		return e => {
+			console.log(e);
 			const type = e.type as keyof HTMLElementEventMap;
 			if (onceEvents.get(listener)?.has(type)) return;
+			const isKeyboardEvent = checkIsKeyboardEvent(e),
+				isMouseEvent = checkIsMouseEvent(e),
+				isPointerEvent = checkIsPointerEvent(e);
+			let code: string;
+			if (exact && (isKeyboardEvent || isMouseEvent || isPointerEvent)) {
+				if (
+					(!modifierKeys.includes("ctrl") && e.ctrlKey) ||
+					(!modifierKeys.includes("shift") && e.shiftKey) ||
+					(!modifierKeys.includes("alt") && e.altKey) ||
+					(!modifierKeys.includes("meta") && e.metaKey)
+				)
+					return;
+			}
+			const baseEventModifiersEnabler = {
+				disabled: undefined as boolean | undefined,
+				set enabled(flag: boolean) {
+					baseEventModifiersEnabler.disabled = flag ? false : (baseEventModifiersEnabler.disabled ?? true);
+				},
+			};
 			for (const modifier of modifiers) {
-				switch (modifier) {
-					case "stop":
-						e.stopPropagation();
-						continue;
-					case "prevent":
-						e.preventDefault();
-						continue;
-					case "handled":
-						e.preventDefault();
-						e.stopPropagation();
-						continue;
-					case "self":
-						if (e.target !== e.currentTarget) return;
-						continue;
-					case "norepeat":
-						if (isKeyboardEvent(e) && e.repeat) return;
-						continue;
-					case "once":
-						const currentEventTypes = onceEvents.get(listener) ?? new Set<string>();
-						currentEventTypes.add(type);
-						onceEvents.set(listener, currentEventTypes);
-						continue;
-				}
-				if (isKeyboardEvent(e) || isMouseEvent(e) || isPointerEvent(e)) {
-					if (isKeyboardEvent(e) && otherKeys.length === 0 && type === "keyup") {
-						if (
-							(modifier === "ctrl" && !["ControlLeft", "ControlRight"].includes(e.code)) ||
-							(modifier === "shift" && !["ShiftLeft", "ShiftRight"].includes(e.code)) ||
-							(modifier === "alt" && !["AltLeft", "AltRight", "AltGraph", "AltGr"].includes(e.code)) ||
-							(modifier === "meta" && !["MetaLeft", "MetaRight"].includes(e.code))
-						)
-							return;
-					} else if (
-						(modifier === "ctrl" && !e.ctrlKey) ||
-						(modifier === "shift" && !e.shiftKey) ||
-						(modifier === "alt" && !e.altKey) ||
-						(modifier === "meta" && !e.metaKey)
-					)
-						return;
-					else if (
-						(modifier === "ctrl" && e.ctrlKey) ||
-						(modifier === "shift" && e.shiftKey) ||
-						(modifier === "alt" && e.altKey) ||
-						(modifier === "meta" && e.metaKey)
-					)
-						continue;
-					if (modifier === "exact")
-						if (
-							(!modifierKeys.includes("ctrl") && e.ctrlKey) ||
-							(!modifierKeys.includes("shift") && e.shiftKey) ||
-							(!modifierKeys.includes("alt") && e.altKey) ||
-							(!modifierKeys.includes("meta") && e.metaKey)
-						)
-							return;
-						else continue;
+				if (modifier === "exact") continue;
+				if (!baseEventModifiersEnabler.disabled)
+					switch (modifier) {
+						case "stop":
+							e.stopPropagation();
+							continue;
+						case "prevent":
+							e.preventDefault();
+							continue;
+						case "handled":
+							e.preventDefault();
+							e.stopPropagation();
+							continue;
+						case "self":
+							if (e.target !== e.currentTarget) return;
+							continue;
+						case "norepeat":
+							if (isKeyboardEvent && e.repeat) return;
+							continue;
+						case "once":
+							const currentEventTypes = onceEvents.get(listener) ?? new Set<string>();
+							currentEventTypes.add(type);
+							onceEvents.set(listener, currentEventTypes);
+							continue;
+					}
+				if (isKeyboardEvent || isMouseEvent || isPointerEvent) {
+					if (modifierKeyEventModifiers.includes(modifier)) {
+						if (isKeyboardEvent && otherKeys.length === 0 && type === "keyup") {
+							if (
+								(modifier === "ctrl" && ["ControlLeft", "ControlRight"].includes(e.code)) ||
+								(modifier === "shift" && ["ShiftLeft", "ShiftRight"].includes(e.code)) ||
+								(modifier === "alt" && ["AltLeft", "AltRight", "AltGraph", "AltGr"].includes(e.code)) ||
+								(modifier === "meta" && ["MetaLeft", "MetaRight"].includes(e.code))
+							)
+								continue;
+							else return;
+						} else {
+							if (
+								(modifier === "ctrl" && e.ctrlKey) ||
+								(modifier === "shift" && e.shiftKey) ||
+								(modifier === "alt" && e.altKey) ||
+								(modifier === "meta" && e.metaKey)
+							)
+								continue;
+							else return;
+						}
+					}
 					if (lockKeyEventModifiers.includes(modifier)) {
-						const key = modifier
-							.replace(/(on|off)$/i, "")
-							.replace("lock", "Lock")
-							.replace(/^\w/, c => c.toUpperCase()) as ModifierKey;
-						const on = modifier.endsWith("on");
+						const { key, on } = resolveLockKey(modifier);
 						if (e.getModifierState(key) !== on) return;
 						else continue;
 					}
 				}
+				if (isPointerEvent && pointerEventModifiers.includes(modifier)) baseEventModifiersEnabler.enabled = e.pointerType === modifier;
+				if (isMouseEvent && mouseEventModifiers.includes(modifier)) baseEventModifiersEnabler.enabled = e.button === mouseButtonCodes[modifier];
+				if (isKeyboardEvent && lowerCasedKeyboardEventModifiers.includes(modifier)) {
+					code ??= unifyKeyboardCode(e.code);
+					baseEventModifiersEnabler.enabled = code === modifier;
+				}
 			}
-			if (isPointerEvent(e) && pointers.length && !pointers.includes(e.pointerType)) return;
-			if (isMouseEvent(e) && mouseCodes.length && !mouseCodes.some(code => e.buttons & code)) return;
-			if (isKeyboardEvent(e) && otherKeys.length) {
-				const code = unifyKeyboardCode(e.code);
-				if (lowerCasedKeyboardEventModifiers.includes(code) && !otherKeys.includes(code)) return;
-			}
+			if (baseEventModifiersEnabler.disabled) return;
 			listener(e);
 		};
 	};
@@ -118,7 +124,7 @@ export default mod;
 // prettier-ignore
 const baseEventModifiers = ["stop", "prevent", "handled", "self", "once", "noRepeat"] as const;
 // prettier-ignore
-const modifierKeyEventModifiers = ["ctrl", "shift", "alt", "meta", "exact"] as const;
+const modifierKeyEventModifiers = ["ctrl", "shift", "alt", "meta"] as const;
 // prettier-ignore
 const lockKeyEventModifiers = ["capsLockOn", "capsLockOff", "numLockOn", "numLockOff", "scrollLockOn", "scrollLockOff"] as const;
 // prettier-ignore
@@ -134,14 +140,14 @@ const allEventModifiers = [
 	...mouseEventModifiers,
 	...pointerEventModifiers,
 	...keyboardEventModifiers,
+	"exact",
 ] as const;
-const lowerCasedMouseEventModifiers = mouseEventModifiers.map(mod => mod.toLowerCase()) as MouseEventModifiers[],
-	lowerCasedKeyboardEventModifiers = keyboardEventModifiers.map(mod => mod.toLowerCase()) as KeyboardEventModifiers[];
+const lowerCasedKeyboardEventModifiers = keyboardEventModifiers.map(mod => mod.toLowerCase()) as KeyboardEventModifiers[];
 
 const mouseButtonCodes = {
-	left: 1,
+	left: 0,
+	middle: 1,
 	right: 2,
-	middle: 4,
 } as const satisfies Record<MouseEventModifiers, number>;
 
 const aliases = {
@@ -200,13 +206,20 @@ function unifyKeyboardCode(code: string) {
 	);
 }
 
-type BaseEventModifiers = (typeof baseEventModifiers)[number];
-type ModifierKeyEventModifiers = (typeof modifierKeyEventModifiers)[number];
-type LockKeyEventModifiers = (typeof lockKeyEventModifiers)[number];
-type MouseEventModifiers = (typeof mouseEventModifiers)[number];
-type PointerEventModifiers = (typeof pointerEventModifiers)[number];
-type KeyboardEventModifiers = (typeof keyboardEventModifiers)[number];
-type AllEventModifiers = BaseEventModifiers | ModifierKeyEventModifiers | LockKeyEventModifiers | MouseEventModifiers | PointerEventModifiers | KeyboardEventModifiers;
+const _capitalize = (string: string) => string[0].toUpperCase() + string.slice(1);
+function resolveLockKey(modifier: LockKeyEventModifiers) {
+	const key = _capitalize(modifier.replace(/(on|off)$/i, "").replace("lock", "Lock")) as ModifierKey;
+	const on = modifier.endsWith("on");
+	return { key, on };
+}
+
+export type BaseEventModifiers = (typeof baseEventModifiers)[number];
+export type ModifierKeyEventModifiers = (typeof modifierKeyEventModifiers)[number];
+export type LockKeyEventModifiers = (typeof lockKeyEventModifiers)[number];
+export type MouseEventModifiers = (typeof mouseEventModifiers)[number];
+export type PointerEventModifiers = (typeof pointerEventModifiers)[number];
+export type KeyboardEventModifiers = (typeof keyboardEventModifiers)[number];
+export type AllEventModifiers = (typeof allEventModifiers)[number];
 type LowerCasedAllEventModifiers = Lowercase<AllEventModifiers>;
 
 type Modifiers<TExclude extends string> = {
