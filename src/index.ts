@@ -222,9 +222,18 @@ export type KeyboardEventModifiers = (typeof keyboardEventModifiers)[number];
 export type AllEventModifiers = (typeof allEventModifiers)[number];
 type LowerCasedAllEventModifiers = Lowercase<AllEventModifiers>;
 
+type NarrowSyntheticEvent<TEvent extends SyntheticEvent, TModifiers extends string> = TEvent &
+	(TModifiers extends PointerEventModifiers ? PointerEvent : unknown) &
+	(TModifiers extends Exclude<MouseEventModifiers, "left" | "right"> ? MouseEvent : unknown) &
+	(TModifiers extends Exclude<KeyboardEventModifiers, "left" | "right"> ? KeyboardEvent : unknown);
+type NarrowNativeEvent<TEvent extends Event, TModifiers extends string> = TEvent &
+	(TModifiers extends PointerEventModifiers ? globalThis.PointerEvent : unknown) &
+	(TModifiers extends Exclude<MouseEventModifiers, "left" | "right"> ? globalThis.MouseEvent : unknown) &
+	(TModifiers extends Exclude<KeyboardEventModifiers, "left" | "right"> ? globalThis.KeyboardEvent : unknown);
+
 type Modifiers<TExclude extends string> = {
-	<TEvent extends SyntheticEvent>(listener?: EventHandler<TEvent>): EventHandler<TEvent>;
-	<TEvent extends Event>(listener?: (e: TEvent) => void): (e: TEvent) => void;
+	<TEvent extends SyntheticEvent>(listener?: EventHandler<NarrowSyntheticEvent<TEvent, TExclude>>): EventHandler<NarrowSyntheticEvent<TEvent, TExclude>>;
+	<TEvent extends Event>(listener?: (e: NarrowNativeEvent<TEvent, TExclude>) => void): (e: NarrowNativeEvent<TEvent, TExclude>) => void;
 } & {
 	[modifier in Exclude<AllEventModifiers, TExclude>]: Modifiers<
 		| TExclude
