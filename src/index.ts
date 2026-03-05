@@ -1,34 +1,34 @@
-import type { SyntheticEvent, EventHandler, KeyboardEvent, MouseEvent, PointerEvent, ModifierKey } from "react";
+import type { default as React, SyntheticEvent, EventHandler, ModifierKey } from "react";
 
-const onceEvents = new WeakMap<EventHandler<SyntheticEvent>, Set<string>>();
+const onceEvents = new WeakMap<Element, WeakMap<EventHandler<SyntheticEvent>, Set<string>>>();
 const noop = () => {};
-const checkIsKeyboardEvent = <T>(e: SyntheticEvent<T>): e is KeyboardEvent<T> => e.nativeEvent instanceof KeyboardEvent || e instanceof KeyboardEvent;
-const checkIsMouseEvent = <T>(e: SyntheticEvent<T>): e is MouseEvent<T> => e.nativeEvent instanceof MouseEvent || e instanceof MouseEvent;
-const checkIsPointerEvent = <T>(e: SyntheticEvent<T>): e is PointerEvent<T> => e.nativeEvent instanceof PointerEvent || e instanceof PointerEvent;
+const checkIsKeyboardEvent = <T>(e: SyntheticEvent<T>): e is React.KeyboardEvent<T> => e.nativeEvent instanceof KeyboardEvent || e instanceof KeyboardEvent;
+const checkIsMouseEvent = <T>(e: SyntheticEvent<T>): e is React.MouseEvent<T> => e.nativeEvent instanceof MouseEvent || e instanceof MouseEvent;
+const checkIsPointerEvent = <T>(e: SyntheticEvent<T>): e is React.PointerEvent<T> => e.nativeEvent instanceof PointerEvent || e instanceof PointerEvent;
 
 const modifiersCallee =
-	(modifiers: (LowerCasedAllEventModifiers | (string & {}))[]) =>
+	(modifiers: Set<LowerCasedAllEventModifiers | (string & {})>) =>
 	<T extends SyntheticEvent>(listener: EventHandler<T> = noop): EventHandler<T> => {
-		if (modifiers.length === 0) throw new RangeError("You have not use any modifiers");
-		const modifierKeys = modifiers.filter(modifier => modifierKeyEventModifiers.includes(modifier)) as ModifierKeyEventModifiers[];
-		const otherKeys = modifiers.filter(modifier => lowerCasedKeyboardEventModifiers.includes(modifier)) as KeyboardEventModifiers[];
-		const exact = modifiers.includes("exact");
-		if (exact && modifierKeys.length === 0)
+		if (modifiers.size === 0) throw new RangeError("You have not use any modifiers");
+		const modifierKeys: Set<ModifierKeyEventModifiers> = modifiers.intersection(new Set(modifierKeyEventModifiers));
+		const otherKeys: Set<KeyboardEventModifiers> = modifiers.intersection(new Set(lowerCasedKeyboardEventModifiers));
+		const exact = modifiers.has("exact");
+		if (exact && modifierKeys.size === 0)
 			throw new RangeError("You are using the `exact` modifier without any modifier keys (like ctrl, shift, alt, meta), just remove it");
 		return e => {
 			console.log(e);
 			const type = e.type as keyof HTMLElementEventMap;
-			if (onceEvents.get(listener)?.has(type)) return;
+			if (onceEvents.get(e.currentTarget)?.get(listener)?.has(type)) return;
 			const isKeyboardEvent = checkIsKeyboardEvent(e),
 				isMouseEvent = checkIsMouseEvent(e),
 				isPointerEvent = checkIsPointerEvent(e);
 			let code: string;
 			if (exact && (isKeyboardEvent || isMouseEvent || isPointerEvent)) {
 				if (
-					(!modifierKeys.includes("ctrl") && e.ctrlKey) ||
-					(!modifierKeys.includes("shift") && e.shiftKey) ||
-					(!modifierKeys.includes("alt") && e.altKey) ||
-					(!modifierKeys.includes("meta") && e.metaKey)
+					(!modifierKeys.has("ctrl") && e.ctrlKey) ||
+					(!modifierKeys.has("shift") && e.shiftKey) ||
+					(!modifierKeys.has("alt") && e.altKey) ||
+					(!modifierKeys.has("meta") && e.metaKey)
 				)
 					return;
 			}
@@ -59,14 +59,17 @@ const modifiersCallee =
 							if (isKeyboardEvent && e.repeat) return;
 							continue;
 						case "once":
-							const currentEventTypes = onceEvents.get(listener) ?? new Set<string>();
+							if (e.currentTarget == null) continue;
+							const currentEventTargets = onceEvents.get(e.currentTarget) ?? new WeakMap();
+							const currentEventTypes = currentEventTargets.get(listener) ?? new Set();
 							currentEventTypes.add(type);
-							onceEvents.set(listener, currentEventTypes);
+							currentEventTargets.set(listener, currentEventTypes);
+							onceEvents.set(e.currentTarget, currentEventTargets);
 							continue;
 					}
 				if (isKeyboardEvent || isMouseEvent || isPointerEvent) {
 					if (modifierKeyEventModifiers.includes(modifier)) {
-						if (isKeyboardEvent && otherKeys.length === 0 && type === "keyup") {
+						if (isKeyboardEvent && otherKeys.size === 0 && type === "keyup") {
 							if (
 								(modifier === "ctrl" && ["ControlLeft", "ControlRight"].includes(e.code)) ||
 								(modifier === "shift" && ["ShiftLeft", "ShiftRight"].includes(e.code)) ||
@@ -104,14 +107,17 @@ const modifiersCallee =
 		};
 	};
 
-const getProxy = (declaredModifiers: LowerCasedAllEventModifiers[] = []) =>
+const getProxy = (declaredModifiers: Set<LowerCasedAllEventModifiers> = new Set()) =>
 	new Proxy(modifiersCallee(declaredModifiers), {
 		get(_, modifier) {
 			if (typeof modifier === "symbol") return;
 			modifier = modifier.toLowerCase();
 			if (modifier in aliases) modifier = aliases[modifier as keyof typeof aliases];
 			const lowerCasedModifier = modifier as LowerCasedAllEventModifiers;
-			return getProxy([...declaredModifiers, ...(declaredModifiers.includes(lowerCasedModifier) ? [] : [lowerCasedModifier])]);
+			const newDeclaredModifiers = new Set(declaredModifiers);
+			if (lowerCasedModifier === "arrow") (["up", "down", "left", "right"] as const).forEach(newDeclaredModifiers.add);
+			else newDeclaredModifiers.add(lowerCasedModifier);
+			return getProxy(newDeclaredModifiers);
 		},
 		has: (_, modifier) => allEventModifiers.includes(modifier),
 		ownKeys: () => allEventModifiers,
@@ -132,7 +138,7 @@ const mouseEventModifiers = ["left", "right", "middle"] as const;
 // prettier-ignore
 const pointerEventModifiers = ["mouse", "pen", "touch"] as const;
 // prettier-ignore
-const keyboardEventModifiers = ["esc", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "tab", "capsLock", "space", "backspace", "enter", "application", "printScreen", "scrollLock", "pause", "insert", "delete", "home", "end", "pageUp", "pageDown", "up", "down", "left", "right", "numLock", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "`", "-", "+", "=", "[", "]", "\\", ";", "'", ",", ".", "/", "*"] as const;
+const keyboardEventModifiers = ["esc", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "tab", "capsLock", "space", "backspace", "enter", "application", "printScreen", "scrollLock", "pause", "insert", "delete", "home", "end", "pageUp", "pageDown", "up", "down", "left", "right", "numLock", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "`", "-", "+", "=", "[", "]", "\\", ";", "'", ",", ".", "/", "*", "arrow"] as const;
 const allEventModifiers = [
 	...baseEventModifiers,
 	...modifierKeyEventModifiers,
@@ -222,18 +228,23 @@ export type KeyboardEventModifiers = (typeof keyboardEventModifiers)[number];
 export type AllEventModifiers = (typeof allEventModifiers)[number];
 type LowerCasedAllEventModifiers = Lowercase<AllEventModifiers>;
 
-type NarrowSyntheticEvent<TEvent extends SyntheticEvent, TModifiers extends string> = TEvent &
-	(TModifiers extends PointerEventModifiers ? PointerEvent : unknown) &
-	(TModifiers extends Exclude<MouseEventModifiers, "left" | "right"> ? MouseEvent : unknown) &
-	(TModifiers extends Exclude<KeyboardEventModifiers, "left" | "right"> ? KeyboardEvent : unknown);
-type NarrowNativeEvent<TEvent extends Event, TModifiers extends string> = TEvent &
-	(TModifiers extends PointerEventModifiers ? globalThis.PointerEvent : unknown) &
-	(TModifiers extends Exclude<MouseEventModifiers, "left" | "right"> ? globalThis.MouseEvent : unknown) &
-	(TModifiers extends Exclude<KeyboardEventModifiers, "left" | "right"> ? globalThis.KeyboardEvent : unknown);
+type NarrowEvent<TEvent extends SyntheticEvent | Event, TModifiers extends string, TElement> =
+	TEvent extends SyntheticEvent ?
+		TEvent &
+			(TModifiers & PointerEventModifiers extends never ? unknown : React.PointerEvent<TElement>) &
+			(TModifiers & Exclude<MouseEventModifiers, "left" | "right"> extends never ? unknown : React.MouseEvent<TElement>) &
+			(TModifiers & Exclude<KeyboardEventModifiers, "left" | "right"> extends never ? unknown : React.KeyboardEvent<TElement>)
+	: TEvent extends Event ?
+		TEvent &
+			(TModifiers & PointerEventModifiers extends never ? unknown : globalThis.PointerEvent) &
+			(TModifiers & Exclude<MouseEventModifiers, "left" | "right"> extends never ? unknown : globalThis.MouseEvent) &
+			(TModifiers & Exclude<KeyboardEventModifiers, "left" | "right"> extends never ? unknown : globalThis.KeyboardEvent)
+	:	never;
 
 type Modifiers<TExclude extends string> = {
-	<TEvent extends SyntheticEvent>(listener?: EventHandler<NarrowSyntheticEvent<TEvent, TExclude>>): EventHandler<NarrowSyntheticEvent<TEvent, TExclude>>;
-	<TEvent extends Event>(listener?: (e: NarrowNativeEvent<TEvent, TExclude>) => void): (e: NarrowNativeEvent<TEvent, TExclude>) => void;
+	<TEvent extends SyntheticEvent | Event, TElement>(
+		listener?: (e: NarrowEvent<TEvent, TExclude, TElement>) => void,
+	): (e: NarrowEvent<TEvent, TExclude, TElement>) => void;
 } & {
 	[modifier in Exclude<AllEventModifiers, TExclude>]: Modifiers<
 		| TExclude
