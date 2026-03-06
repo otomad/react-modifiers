@@ -7,7 +7,7 @@ const config: Config = {
 	semi: true,
 	singleQuote: false,
 	experimentalTernaries: true,
-	printWidth: 170,
+	printWidth: 120,
 	arrowParens: "avoid",
 };
 

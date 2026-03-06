@@ -86,3 +86,25 @@ testEvent(
 		},
 	},
 );
+
+testEvent(
+	"pointer type test",
+	{ onPointerDown: mod.mouse.left(change) },
+	{
+		"mouse click": async button => {
+			button.click();
+			return true;
+		},
+	},
+);
+
+testEvent(
+	"pointer type or test",
+	{ onPointerDown: mod.mouse.left.touch(change) },
+	{
+		"mouse click": async button => {
+			button.click();
+			return true;
+		},
+	},
+);
