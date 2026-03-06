@@ -18,10 +18,6 @@ const modifiersCallee =
 			new Set(lowerCasedKeyboardEventModifiers),
 		);
 		const exact = modifiers.has("exact");
-		if (exact && modifierKeys.size === 0)
-			throw new RangeError(
-				"You are using the `exact` modifier without any modifier keys (like ctrl, shift, alt, meta), just remove it",
-			);
 		return e => {
 			console.log(e);
 			const type = e.type as keyof HTMLElementEventMap;
