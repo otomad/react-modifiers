@@ -1,6 +1,6 @@
 {
 	"name": "react-modifiers",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Use modifiers to intercept event handling more concisely in React, like \"stop\", \"prevent\".",
 	"author": "lunate",
 	"license": "MIT",

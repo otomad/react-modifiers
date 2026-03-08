@@ -19,7 +19,6 @@ const modifiersCallee =
 		);
 		const exact = modifiers.has("exact");
 		return e => {
-			console.log(e);
 			const type = e.type as keyof HTMLElementEventMap;
 			if (onceEvents.get(e.currentTarget)?.get(listener)?.has(type)) return;
 			const isKeyboardEvent = checkIsKeyboardEvent(e),
@@ -93,8 +92,11 @@ const modifiersCallee =
 						else continue;
 					}
 				}
-				if (isPointerEvent && pointerEventModifiers.includes(modifier))
-					baseEventModifiersEnabler.enableByPointerEvent = e.pointerType === modifier;
+				if (isPointerEvent && pointerEventModifiers.includes(modifier)) {
+					const pointerType = getPointerType(e);
+					if (pointerType != undefined)
+						baseEventModifiersEnabler.enableByPointerEvent = pointerType === modifier;
+				}
 				if (isMouseEvent && mouseEventModifiers.includes(modifier))
 					baseEventModifiersEnabler.enableByMouseEvent = e.button === mouseButtonCodes[modifier];
 				if (isKeyboardEvent && lowerCasedKeyboardEventModifiers.includes(modifier)) {
@@ -220,6 +222,18 @@ function resolveLockKey(modifier: LockKeyEventModifiers) {
 	const key = _capitalize(modifier.replace(/(on|off)$/i, "").replace("lock", "Lock")) as ModifierKey;
 	const on = modifier.endsWith("on");
 	return { key, on };
+}
+
+function getPointerType(e: React.PointerEvent | React.MouseEvent | globalThis.PointerEvent) {
+	// For explict pointer events (e.g. `onPointerDown`, `onPointerUp`), React will wrap it as a synthetic pointer event,
+	// it will have `pointerType` property.
+	if ("pointerType" in e) return e.pointerType as PointerEventModifiers;
+	// For `onClick` event, React will wrap it as a synthetic mouse event, but its native event is a pointer event,
+	// which will have `pointerType` property in modern browsers (Chromium 92+, Firefox 129+, Safari 18.2+).
+	else if ("nativeEvent" in e && "pointerType" in e.nativeEvent)
+		return (e.nativeEvent as globalThis.PointerEvent).pointerType as PointerEventModifiers;
+	// In older browsers, the native event of `onClick` is a mouse event, so we don't know what the pointer type is.
+	else return undefined;
 }
 
 class BaseEventModifiersEnabler {

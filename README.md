@@ -74,14 +74,13 @@ import mod from "react-modifiers";
 Modifiers are executed in the order they are chained. This affects behavior:
 
 - `mod.prevent.self`: Prevents default behavior for **all clicks** (element + children)
-
 - `mod.self.prevent`: Prevents default behavior **only for clicks on the element itself**
 
-### Keyboard Modifier Logic Rules
+### Modifier Logic Rules
 
-- For keyboard modifier keys (`ctrl`/`shift`/`alt`/`meta`): Chained modifiers mean **AND** (all must be pressed)
+- For keyboard modifier key modifiers (`ctrl`/`shift`/`alt`/`meta`): Chained modifiers mean **AND** (all must be pressed)
 
-- For keyboard character/function keys (e.g., `a`/`b`/`space`/`tab`/`enter`): Chained modifiers mean **OR** (any one pressed)
+- For other modifiers—keyboard character/function key modifiers, mouse button modifiers, pointer type modifiers—except universal modifiers (e.g., `a`/`b`/`space`/`tab`/`enter`/`middle`/`right`/`touch`): Chained modifiers mean **OR** (any one pressed or used)
 
 ## Full Modifier Reference
 
@@ -99,13 +98,13 @@ Apply to any React synthetic event type:
 
 ### 2. Modifier Key Modifiers (KeyboardEvent/MouseEvent/PointerEvent)
 
-Apply to keyboard, mouse, or pointer events:
+Apply to keyboard, mouse, or pointer events (case-insensitive):
 
 |Modifier|Behavior|
 |---|---|
-|`.ctrl`|Triggers handler only when <kbd>Ctrl</kbd> key is pressed|
+|`.ctrl`|Triggers handler only when <kbd>Ctrl/Control</kbd> key is pressed|
 |`.shift`|Triggers handler only when <kbd>Shift</kbd> key is pressed|
-|`.alt`|Triggers handler only when <kbd>Alt</kbd> key is pressed|
+|`.alt`|Triggers handler only when <kbd>Alt/Option</kbd> key is pressed|
 |`.meta`|Triggers handler only when <kbd>Win/Command</kbd> key is pressed|
 |`.capsLockOn`|Triggers handler only when <kbd>CapsLock</kbd> is active|
 |`.capsLockOff`|Triggers handler only when <kbd>CapsLock</kbd> is inactive|
@@ -117,7 +116,7 @@ Apply to keyboard, mouse, or pointer events:
 
 > [!NOTE]
 >
-> - `.ctrl` works for both left and right <kbd>Ctrl</kbd> key (similar to other modifier keys).
+> - `.ctrl` works for both left and right <kbd>Ctrl/Control</kbd> key (similar to other modifier keys).
 > - Do not use both `.capsLockOn` and `.capsLockOff` (similar to other lock keys) simultaneously, this will never trigger the handler!
 
 #### `.exact` Examples
@@ -143,7 +142,7 @@ Apply to keyboard, mouse, or pointer events:
 > <button onKeyDown={mod.ctrl.exact.p(handleClick)} />
 > ```
 
-### 3. Keyboard-Only Modifiers (KeyboardEvent)
+### 3. Other Key Modifiers (KeyboardEvent)
 
 Apply exclusively to keyboard events (`onKeyDown`/`onKeyUp`/`onKeyPress`):
 
@@ -167,7 +166,7 @@ Common keys supported (case-insensitive):
 
 #### For Numpad
 
-- It shares the same modifiers as the main. For example, `[0]` works for both <kbd>0/)</kbd> key and numpad <kbd>0</kbd> key. Same as other numbers, `["."]`, `["-"]`, `["/"]`, `.enter`.
+- It shares the same modifiers as the main. For example, `[0]` works for both <kbd>0/)</kbd> key and numpad <kbd>0/Insert</kbd> key. Same as other numbers, `["."]`, `["-"]`, `["/"]`, `.enter`.
 - `["+"]` is an alias of `["="]`, and it works for both <kbd>=/+</kbd> key and numpad <kbd>+</kbd> key.
 - `["*"]` works for numpad <kbd>\*</kbd> key only, it doesn't work for <kbd>8/\*</kbd> key.
 
@@ -181,7 +180,6 @@ Common keys supported (case-insensitive):
 #### Keyboard Example Combinations
 
 ```jsx
-
 // Ctrl+Shift+L OR Ctrl+Shift+P (L/P = OR; Ctrl/Shift = AND)
 <button onKeyDown={mod.ctrl.shift.l.p(handleKeyDown)} />
 
@@ -195,7 +193,7 @@ Common keys supported (case-insensitive):
 <button onKeyDown={mod.arrow.noRepeat(handleKeyDown)} />
 ```
 
-### 4. Mouse/Pointer Modifiers (MouseEvent/PointerEvent)
+### 4. Mouse Button Modifiers (MouseEvent/PointerEvent)
 
 Apply to mouse or pointer events (`onClick`/`onMouseDown`/`onPointerUp` etc.):
 
@@ -205,7 +203,17 @@ Apply to mouse or pointer events (`onClick`/`onMouseDown`/`onPointerUp` etc.):
 |`.right`|Triggers handler only for right mouse button clicks|
 |`.middle`|Triggers handler only for middle mouse button clicks|
 
-### 5. Pointer-Only Modifiers (PointerEvent)
+#### Mouse Example Combinations
+
+You can chain them together to indicate that any of them can trigger the handler.
+
+```jsx
+// Triggers handler for both middle mouse button and right mouse button
+// Left mouse button will not trigger the handler
+<button onClick={mod.middle.right(handleClick)} />
+```
+
+### 5. Pointer Type Modifiers (PointerEvent)
 
 Apply exclusively to pointer events (`onPointerDown`/`onPointerEnter` etc.):
 
@@ -215,20 +223,40 @@ Apply exclusively to pointer events (`onPointerDown`/`onPointerEnter` etc.):
 |`.touch`|Triggers handler only for touch input (mobile/tablet)|
 |`.pen`|Triggers handler only for stylus/pen input|
 
+#### Pointer Example Combinations
+
+You can chain them together to indicate that any of them can trigger the handler.
+
+```jsx
+// Triggers handler for both touch and pen input
+// Mouse will not trigger the handler
+<button onPointerDown={mod.touch.pen(handleTouch)} />
+```
+
 ## Advanced Examples
+
+### Combine Modifier Keys + Mouse/Pointer Modifiers
+
+```jsx
+// Ctrl + mouse left click (Not Ctrl+Left Arrow!)
+<button onClick={mod.ctrl.left(handleCtrlClick)} />
+
+// Shift + touch screen, with NumLock on
+<button onClick={mod.shift.touch.numLockOn(handleShiftTouch)} />
+```
 
 ### Combine Mouse + Universal Modifiers
 
 ```jsx
-// Right click only (self), prevent default, trigger once
-<button onClick={mod.self.right.prevent.once(handleRightClick)} />
+// Prevent default, trigger once, right click only (self)
+<button onClick={mod.prevent.once.right.self(handleRightClick)} />
 ```
 
 ### Combine Mouse + Pointer Modifiers
 
 ```jsx
 // Mouse or touch input, middle or right click only if mouse input
-<button onClick={mod.middle.right.mouse.touch.once(handleClick)} />
+<button onPointerUp={mod.middle.right.mouse.touch(handleClick)} />
 ```
 
 ### Complex Keyboard Shortcut
@@ -240,15 +268,19 @@ Apply exclusively to pointer events (`onPointerDown`/`onPointerEnter` etc.):
 
 ## Notes
 
-* **Event Type Compatibility**: Ensure modifiers match the event type (e.g., `.touch` only works with `onPointerDown`, not `onKeyDown`).
+* **TypeScript Support:** Full TypeScript support. Due to technical limitations, the modifiers for non specific events will also be displayed in the suggestion list, but it can report errors normally after use.
 
-* **Chaining Order**: Always test modifier order—execution is sequential (e.g., `.self.prevent` ≠ `.prevent.self`).
+* **Case-Insensitive:** All modifiers are case-insensitive. However, TypeScript will suggest the most appropriate camel case.
 
-* **Synthetic Events And Native Events**: React Modifiers works with both React synthetic events and native DOM events.
+* **Event Type Compatibility:** Ensure modifiers match the event type (e.g., `.touch` only works with `onPointerDown`, not `onKeyDown`).
 
-* **Browser Support**: Follows React's browser support matrix—modifiers like `.touch` require PointerEvent support (modern browsers); `.noRepeat` require Chromium 137 and above.
+* **Chaining Order:** Always test modifier order—execution is sequential (e.g., `.self.prevent` ≠ `.prevent.self`).
 
-* **TypeScript Support**: Full TypeScript support. Due to technical limitations, the modifiers for non specific events will also be displayed in the suggestion list, but it can report errors normally after use.
+* **Do not Duplicate:** Duplicate modifiers will not have any effect, they will only waste your traffic out of thin air.
+
+* **Synthetic Events And Native Events:** React Modifiers work with both React synthetic events and native DOM events.
+
+* **Browser Support:** Follows React's browser support matrix—modifiers like `.touch` require PointerEvent support (modern browsers); `.noRepeat` require Chromium 137 and above.
 
 ## License
 
