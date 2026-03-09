@@ -98,7 +98,7 @@ const modifiersCallee =
 						baseEventModifiersEnabler.enableByPointerEvent = pointerType === modifier;
 				}
 				if (isMouseEvent && mouseEventModifiers.includes(modifier))
-					baseEventModifiersEnabler.enableByMouseEvent = e.button === mouseButtonCodes[modifier];
+					baseEventModifiersEnabler.enableByMouseEvent = !!(e.buttons & mouseButtonsCodes[modifier]);
 				if (isKeyboardEvent && lowerCasedKeyboardEventModifiers.includes(modifier)) {
 					code ??= unifyKeyboardCode(e.code);
 					baseEventModifiersEnabler.enableByKeyboardEvent = code === modifier;
@@ -155,10 +155,11 @@ const lowerCasedKeyboardEventModifiers = keyboardEventModifiers.map(mod =>
 	mod.toLowerCase(),
 ) as KeyboardEventModifiers[];
 
-const mouseButtonCodes = {
-	left: 0,
-	middle: 1,
+// Detect by `e.buttons` instead of `e.button`, because if in `onMouseEnter` and no button down, it will treat it as left mouse button down.
+const mouseButtonsCodes = {
+	left: 1,
 	right: 2,
+	middle: 4,
 } as const satisfies Record<MouseEventModifiers, number>;
 
 const aliases = {
